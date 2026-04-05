@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Guitar Chords</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f5f0e4;
+    --card-bg: #faf7f0;
+    --text-dark: #2c3e2d;
+    --text-mid: #5a6b5c;
+    --text-light: #8a9b8c;
+    --rose: #d4a5a0;
+    --rose-light: #eddbd9;
+    --rose-dark: #b8827c;
+    --sand: #d4c88a;
+    --sand-light: #eee8c8;
+    --sand-dark: #b8a85a;
+    --blue: #a8bcd4;
+    --blue-light: #d8e4ee;
+    --blue-dark: #7898b8;
+    --sage: #a0c4a8;
+    --sage-light: #d0e8d4;
+    --sage-dark: #6aaa78;
+    --border: #e0d8c8;
+    --shadow: rgba(44,62,45,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-dark);
+    font-family: 'Lato', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  .app-header {
+    background: linear-gradient(160deg, #e8dfc8 0%, #d8e8d8 50%, #c8d8e8 100%);
+    padding: 52px 20px 28px;
+    text-align: center;
+    position: relative;
+  }
+  .app-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: var(--border);
+  }
+  .app-eyebrow {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-mid);
+    margin-bottom: 6px;
+    font-weight: 400;
+  }
+  .app-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    font-style: italic;
+    color: var(--text-dark);
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  /* Sync indicator */
+  .sync-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--sage);
+    margin-left: 8px;
+    vertical-align: middle;
+    transition: background 0.3s;
+  }
+  .sync-dot.syncing  { background: var(--sand-dark); animation: pulse 0.8s infinite; }
+  .sync-dot.error    { background: var(--rose-dark); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px 8px;
+    cursor: pointer;
+    gap: 3px;
+  }
+  .nav-icon { font-size: 20px; }
+  .nav-label {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    font-weight: 400;
+  }
+  .nav-item.active .nav-label { color: var(--text-dark); font-weight: 700; }
+  .nav-item.active .nav-icon  { transform: scale(1.1); }
+
+  .page { display: none; padding: 20px 16px; }
+  .page.active { display: block; }
+
+  .section-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-style: italic;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+  }
+  .section-sub {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 14px;
+  }
+
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .filter-pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border: 1.5px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-mid);
+    transition: all 0.15s;
+  }
+  .filter-pill.active-rose { background: var(--rose); border-color: var(--rose-dark); color: var(--text-dark); }
+  .filter-pill.active-sand { background: var(--sand); border-color: var(--sand-dark); color: var(--text-dark); }
+  .filter-pill.active-blue { background: var(--blue); border-color: var(--blue-dark); color: var(--text-dark); }
+  .filter-pill.active-sage { background: var(--sage); border-color: var(--sage-dark); color: var(--text-dark); }
+
+  .chord-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .chord-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 6px 6px;
+    text-align: center;
+    box-shadow: 0 2px 8px var(--shadow);
+    position: relative;
+  }
+
+  .status-badge {
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--card-bg);
+    cursor: pointer;
+    z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-light);
+    transition: all 0.15s;
+  }
+  .status-badge.s-notlearned { background: var(--rose-light);  border-color: var(--rose-dark);  color: var(--rose-dark); }
+  .status-badge.s-learning   { background: var(--sand-light);  border-color: var(--sand-dark);  color: var(--sand-dark); }
+  .status-badge.s-know       { background: var(--blue-light);  border-color: var(--blue-dark);  color: var(--blue-dark); }
+  .status-badge.s-mastered   { background: var(--sage-light);  border-color: var(--sage-dark);  color: var(--sage-dark); }
+
+  .chord-tap-area { cursor: pointer; }
+  .chord-tap-area:active { opacity: 0.7; }
+
+  .chord-card-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-style: italic;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+    font-weight: 600;
+  }
+
+  .chord-diagram { display: inline-block; }
+  .chord-diagram svg { display: block; margin: 0 auto; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(44,62,45,0.35);
+    z-index: 200;
+    display: flex; align-items: flex-end;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--card-bg);
+    border-radius: 24px 24px 0 0;
+    padding: 24px 24px 44px;
+    width: 100%;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px; font-style: italic; font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 4px; text-align: center;
+  }
+  .modal-subtitle {
+    font-size: 12px; color: var(--text-light);
+    text-align: center; margin-bottom: 20px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .modal-diagram-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
+  .modal-desc {
+    font-size: 14px; color: var(--text-mid); line-height: 1.7;
+    background: var(--bg); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .modal-fingers { font-size: 13px; color: var(--text-mid); line-height: 1.8; }
+  .modal-fingers strong { color: var(--text-dark); }
+  .modal-status-label {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-light); margin: 18px 0 8px; font-weight: 700;
+  }
+  .modal-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .modal-status-btn {
+    flex: 1; min-width: 56px;
+    padding: 8px 4px; border-radius: 10px;
+    border: 1.5px solid var(--border); background: var(--card-bg);
+    font-family: 'Lato', sans-serif; font-size: 10px;
+    font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+    color: var(--text-mid); cursor: pointer; text-align: center;
+    transition: all 0.15s;
+  }
+  .modal-status-btn.active-default    { border-color: var(--text-mid); color: var(--text-dark); }
+  .modal-status-btn.active-notlearned { background: var(--rose-light); border-color: var(--rose-dark); color: var(--text-dark); }
+  .modal-status-btn.active-learning   { background: var(--sand-light); border-color: var(--sand-dark); color: var(--text-dark); }
+  .modal-status-btn.active-know       { background: var(--blue-light); border-color: var(--blue-dark); color: var(--text-dark); }
+  .modal-status-btn.active-mastered   { background: var(--sage-light); border-color: var(--sage-dark); color: var(--text-dark); }
+  .modal-close {
+    width: 100%; padding: 14px;
+    background: var(--text-dark); color: var(--bg);
+    border: none; border-radius: 12px;
+    font-family: 'Lato', sans-serif; font-size: 14px;
+    font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; margin-top: 18px;
+  }
+
+  /* Scale cards */
+  .scale-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .scale-card-header {
+    padding: 16px 18px; cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .scale-badge {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .badge-beginner     { background: var(--sage-light); }
+  .badge-intermediate { background: var(--sand-light); }
+  .badge-advanced     { background: var(--blue-light); }
+  .scale-header-text { flex: 1; }
+  .scale-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px; font-style: italic; font-weight: 600;
+    color: var(--text-dark); margin-bottom: 2px;
+  }
+  .scale-level { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-light); }
+  .scale-chevron { color: var(--text-light); font-size: 16px; transition: transform 0.2s; flex-shrink: 0; }
+  .scale-card.open .scale-chevron { transform: rotate(180deg); }
+  .scale-body { display: none; padding: 0 14px 20px; border-top: 1px solid var(--border); }
+  .scale-card.open .scale-body { display: block; }
+  .scale-description { font-size: 13px; color: var(--text-mid); line-height: 1.7; margin: 14px 0 16px; }
+  .tab-label {
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text-light); margin-bottom: 10px; font-weight: 700;
+  }
+
+  /* Fretboard */
+  .fretboard-wrap {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    margin-bottom: 14px; border-radius: 10px;
+    background: var(--bg); padding: 12px 10px 10px;
+  }
+  .fretboard { display: inline-block; }
+  .fb-row { display: flex; align-items: stretch; }
+  .fb-label {
+    width: 18px; display: flex; align-items: center;
+    justify-content: flex-end; padding-right: 5px;
+    font-size: 9px; font-weight: 700; color: var(--text-light); flex-shrink: 0;
+  }
+  .fb-nut { width: 5px; background: var(--text-dark); flex-shrink: 0; border-radius: 1px; }
+  .fb-fret {
+    width: 42px; height: 30px;
+    border-right: 1.5px solid #c8c0b0; border-bottom: 1.5px solid #c8c0b0;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; background: var(--bg);
+  }
+  .fb-row:first-child .fb-fret { border-top: 1.5px solid #c8c0b0; }
+  .fb-note {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--text-dark); color: #faf7f0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; line-height: 1;
+  }
+  .fb-note.root { background: var(--rose-dark); }
+  .fb-nums-row { display: flex; align-items: center; margin-top: 5px; }
+  .fb-nums-spacer { width: 23px; flex-shrink: 0; }
+  .fb-nums-nut   { width: 5px;  flex-shrink: 0; }
+  .fb-num { width: 42px; text-align: center; font-size: 9px; color: var(--text-light); flex-shrink: 0; }
+
+  .scale-positions {
+    font-size: 13px; color: var(--text-mid); line-height: 1.8;
+    background: var(--bg); border-radius: 10px; padding: 12px 14px;
+  }
+  .scale-positions strong { color: var(--text-dark); }
+  .level-tag {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; margin-left: 8px; vertical-align: middle;
+  }
+  .tag-beginner     { background: var(--sage-light); color: var(--sage-dark); }
+  .tag-intermediate { background: var(--sand-light); color: var(--sand-dark); }
+  .tag-advanced     { background: var(--blue-light); color: var(--blue-dark); }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-eyebrow">Your reference guide</div>
+  <div class="app-title" id="headerTitle">Guitar Chords <span class="sync-dot" id="syncDot" title="Sync status"></span></div>
+</div>
+
+<div class="bottom-nav">
+  <div class="nav-item active" onclick="showPage('chords', this)">
+    <span class="nav-icon">🎸</span>
+    <span class="nav-label">Chords</span>
+  </div>
+  <div class="nav-item" onclick="showPage('scales', this)">
+    <span class="nav-icon">🎵</span>
+    <span class="nav-label">Scales</span>
+  </div>
+</div>
+
+<!-- CHORDS PAGE -->
+<div class="page active" id="page-chords">
+  <div class="filter-bar">
+    <div class="filter-pill active-rose" onclick="filterChords('all', this)">All</div>
+    <div class="filter-pill" onclick="filterChords('major', this)">Major</div>
+    <div class="filter-pill" onclick="filterChords('minor', this)">Minor</div>
+    <div class="filter-pill" onclick="filterChords('seventh', this)">7ths</div>
+    <div class="filter-pill" onclick="filterChords('barre', this)">Barre</div>
+    <div class="filter-pill" onclick="filterChords('other', this)">Other</div>
+  </div>
+  <div class="chord-grid" id="chordGrid"></div>
+</div>
+
+<!-- SCALES PAGE -->
+<div class="page" id="page-scales">
+  <div class="section-heading">Scales</div>
+  <div class="section-sub">Beginner-friendly first — tap any scale to expand</div>
+  <div id="scaleList"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title"    id="modalTitle"></div>
+    <div class="modal-subtitle" id="modalSubtitle"></div>
+    <div class="modal-diagram-wrap" id="modalDiagram"></div>
+    <div class="modal-desc"    id="modalDesc"></div>
+    <div class="modal-fingers" id="modalFingers"></div>
+    <div class="modal-status-label">Progress</div>
+    <div class="modal-status-row" id="modalStatusRow"></div>
+    <button class="modal-close" onclick="closeModalDirect()">Close</button>
+  </div>
+</div>
+
+<script>
+// ─── SUPABASE ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://xmikgimkpkhyvslsrvgg.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtaWtnaW1rcGtoeXZzbHNydmdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzODgzNDUsImV4cCI6MjA5MDk2NDM0NX0.az1-DCYIx0cEB6Bc-ssvfa0hiQwmxcS8i26K-KOlL9M';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Stable device ID — persists per browser/device
+function getDeviceId() {
+  let id = localStorage.getItem('gtr_device_id');
+  if (!id) { id = 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('gtr_device_id', id); }
+  return id;
+}
+const DEVICE_ID = getDeviceId();
+
+// Local cache: { chordKey: status }
+let statusCache = {};
+let syncTimer = null;
+const syncDot = document.getElementById('syncDot');
+
+function setSyncState(state) { // 'ok' | 'syncing' | 'error'
+  syncDot.className = 'sync-dot' + (state !== 'ok' ? ' ' + state : '');
+}
+
+// Load all statuses from Supabase on startup
+async function loadStatuses() {
+  setSyncState('syncing');
+  try {
+    const { data, error } = await sb
+      .from('chord_progress')
+      .select('chord_key, status')
+      .eq('device_id', DEVICE_ID);
+    if (error) throw error;
+    statusCache = {};
+    (data || []).forEach(row => { statusCache[row.chord_key] = row.status; });
+    setSyncState('ok');
+  } catch (e) {
+    console.warn('Supabase load failed, using localStorage fallback', e);
+    setSyncState('error');
+    // Fallback: load from localStorage
+    try { statusCache = JSON.parse(localStorage.getItem('gtr_statuses') || '{}'); } catch {}
+  }
+  renderChords();
+}
+
+// Debounced save to Supabase
+function saveStatus(key, val) {
+  // Update cache and local backup immediately
+  if (val === '') delete statusCache[key]; else statusCache[key] = val;
+  try { localStorage.setItem('gtr_statuses', JSON.stringify(statusCache)); } catch {}
+
+  // Debounce cloud write
+  clearTimeout(syncTimer);
+  setSyncState('syncing');
+  syncTimer = setTimeout(async () => {
+    try {
+      if (val === '') {
+        await sb.from('chord_progress').delete()
+          .eq('device_id', DEVICE_ID).eq('chord_key', key);
+      } else {
+        await sb.from('chord_progress').upsert({
+          device_id: DEVICE_ID,
+          chord_key: key,
+          status: val,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'device_id,chord_key' });
+      }
+      setSyncState('ok');
+    } catch (e) {
+      console.warn('Supabase save failed', e);
+      setSyncState('error');
+    }
+  }, 600);
+}
+
+// ─── STATUS ───────────────────────────────────────────────────────────────────
+const STATUS_CYCLE = ['', 'notlearned', 'learning', 'know', 'mastered'];
+const STATUS_ICON  = { '':'', notlearned:'✕', learning:'〜', know:'✓', mastered:'★' };
+const STATUS_NAME  = { '':'Default', notlearned:'Not Learned', learning:'Learning', know:'Know It', mastered:'Mastered' };
+
+function getStatus(key)    { return statusCache[key] || ''; }
+function cycleStatus(key)  {
+  const cur  = getStatus(key);
+  const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
+  saveStatus(key, next);
+  return next;
+}
+function setStatusDirect(key, val) { saveStatus(key, val); }
+
+// ─── CHORD DATA ───────────────────────────────────────────────────────────────
+// tuning: [lowE, A, D, G, B, highe]  -1=mute, 0=open, n=fret
+const CHORDS = [
+  // MAJOR
+  {name:'C',     full:'C Major',             category:'major',   tuning:[-1,3,2,0,1,0],  desc:'One of the first chords you learn. Warm and full-bodied, used in countless pop and folk songs.',      fingering:'Index: B string 1st fret · Middle: D string 2nd fret · Ring: A string 3rd fret · Low E muted'},
+  {name:'D',     full:'D Major',             category:'major',   tuning:[-1,-1,0,2,3,2], desc:'Bright and jangly. Mute the low E and A strings. Great for strumming.',                               fingering:'Index: G string 2nd fret · Middle: high e 2nd fret · Ring: B string 3rd fret'},
+  {name:'E',     full:'E Major',             category:'major',   tuning:[0,2,2,1,0,0],   desc:'Full, resonant open chord — all six strings ring. Foundation of rock and pop.',                       fingering:'Index: G string 1st fret · Middle: A string 2nd fret · Ring: D string 2nd fret'},
+  {name:'G',     full:'G Major',             category:'major',   tuning:[3,2,0,0,0,3],   desc:'One of the most-used chords in acoustic music. Pairs beautifully with Cadd9.',                        fingering:'Middle: A string 2nd fret · Ring: low E 3rd fret · Pinky: high e 3rd fret'},
+  {name:'A',     full:'A Major',             category:'major',   tuning:[-1,0,2,2,2,0],  desc:'Three fingers bunched together on the second fret. Clean and punchy.',                                fingering:'Index: D string 2nd fret · Middle: G string 2nd fret · Ring: B string 2nd fret · Low E muted'},
+  {name:'F',     full:'F Major',             category:'major',   tuning:[1,3,3,2,1,1],   barre:{fret:1,from:0,to:5}, desc:'The notorious first barre chord. Index finger bars all six strings at fret 1. Worth the effort.',fingering:'Index: full barre fret 1 · Middle: G string 2nd fret · Ring: A string 3rd fret · Pinky: D string 3rd fret'},
+  {name:'B',     full:'B Major',             category:'major',   tuning:[-1,2,4,4,4,2],  barre:{fret:2,from:1,to:5}, desc:'A-shape barre at fret 2. Mute the low E. Common in pop and rock.',                                 fingering:'Index: barre fret 2 (A–high e) · Ring: D, G, B strings at fret 4'},
+  // MINOR
+  {name:'Am',    full:'A Minor',             category:'minor',   tuning:[-1,0,2,2,1,0],  desc:'Melancholic and expressive. One of the easiest minor chords — great starting point.',                 fingering:'Index: B string 1st fret · Middle: D string 2nd fret · Ring: G string 2nd fret · Low E muted'},
+  {name:'Em',    full:'E Minor',             category:'minor',   tuning:[0,2,2,0,0,0],   desc:'Only two fingers needed. Deep and moody. All six strings ring open.',                                 fingering:'Middle: A string 2nd fret · Ring: D string 2nd fret'},
+  {name:'Dm',    full:'D Minor',             category:'minor',   tuning:[-1,-1,0,2,3,1], desc:'A slightly sad, wistful sound. Used in flamenco, pop, and folk.',                                     fingering:'Index: high e 1st fret · Middle: G string 2nd fret · Ring: B string 3rd fret · Low strings muted'},
+  {name:'Bm',    full:'B Minor',             category:'minor',   tuning:[-1,2,4,4,3,2],  barre:{fret:2,from:1,to:5}, desc:'One of the most common minor barres. Mute the low E. Appears in hundreds of pop and folk songs.',  fingering:'Index: barre fret 2 (A–high e) · Ring: D string 4th fret · Pinky: G string 4th fret'},
+  {name:'F#m',   full:'F# Minor',            category:'minor',   tuning:[2,4,4,2,2,2],   barre:{fret:2,from:0,to:5}, desc:'Full barre at 2nd fret. Common in pop, indie, and folk in the key of D or A.',                     fingering:'Index: full barre at fret 2 · Ring: A & D strings at fret 4'},
+  {name:'C#m',   full:'C# Minor',            category:'minor',   tuning:[-1,4,6,6,5,4],  barre:{fret:4,from:1,to:5}, desc:'Barre at the 4th fret. Very common in pop songs — appears in countless hits.',                     fingering:'Index: barre at fret 4 (A–high e) · Ring: D, G, B strings at fret 6'},
+  // SEVENTHS
+  {name:'G7',    full:'G7',                  category:'seventh', tuning:[3,2,0,0,0,1],   desc:'G with an added flat 7th. The blues workhorse. Wants to resolve to C.',                              fingering:'Index: high e 1st fret · Middle: A string 2nd fret · Ring: low E 3rd fret'},
+  {name:'C7',    full:'C7',                  category:'seventh', tuning:[-1,3,2,3,1,0],  desc:'C with a bluesy edge. Resolves strongly to F. Essential for blues and jazz-pop.',                    fingering:'Index: B string 1st fret · Middle: D string 2nd fret · Ring: A string 3rd fret · Pinky: G string 3rd fret'},
+  {name:'D7',    full:'D7',                  category:'seventh', tuning:[-1,-1,0,2,1,2], desc:'Bright dominant 7th. Loves to resolve to G. Very common in folk and country.',                       fingering:'Index: B string 1st fret · Middle: high e 2nd fret · Ring: G string 2nd fret'},
+  {name:'E7',    full:'E7',                  category:'seventh', tuning:[0,2,2,1,3,0],   desc:'E with a bluesy dominant 7th. All six strings. Essential for blues in A.',                           fingering:'Index: G string 1st fret · Middle: A string 2nd fret · Ring: D string 2nd fret · Pinky: B string 3rd fret'},
+  {name:'A7',    full:'A7',                  category:'seventh', tuning:[-1,0,2,0,2,0],  desc:'Easy and expressive. Alternates nicely with D. Common in folk, blues and country.',                  fingering:'Index: D string 2nd fret · Ring: B string 2nd fret · G string open'},
+  {name:'Am7',   full:'Am7',                 category:'seventh', tuning:[-1,0,2,0,1,0],  desc:'Soft, jazzy minor 7th. One of the easiest jazz chords — just two fingers.',                          fingering:'Index: B string 1st fret · Middle: D string 2nd fret'},
+  {name:'Dm7',   full:'Dm7',                 category:'seventh', tuning:[-1,-1,0,2,1,1], desc:'The most common minor 7th in acoustic jazz-pop. Smooth and melancholic.',                            fingering:'Index: high e & B strings 1st fret · Middle: G string 2nd fret'},
+  {name:'Cmaj7', full:'Cmaj7',               category:'seventh', tuning:[-1,3,2,0,0,0],  desc:'Dreamy, open major 7th. Lift your first finger off C. Very easy and beautiful.',                     fingering:'Middle: D string 2nd fret · Ring: A string 3rd fret · B, G, high e strings all open'},
+  {name:'Fmaj7', full:'Fmaj7',               category:'seventh', tuning:[0,3,3,2,1,0],   desc:'Beautiful harp-like chord. Often easier than a full F barre — great gateway chord.',                 fingering:'Index: G & B strings 1st fret · Middle: D string 2nd fret · Ring: A string 3rd fret'},
+  {name:'Gmaj7', full:'Gmaj7',               category:'seventh', tuning:[3,2,0,0,0,2],   desc:'G with a floating, ethereal quality. Common in jazz and indie folk.',                                 fingering:'Middle: A string 2nd fret · Ring: low E 3rd fret · Pinky: high e 2nd fret'},
+  // BARRE
+  {name:'F',     full:'F Barre (E shape)',   category:'barre',   tuning:[1,3,3,2,1,1],   barre:{fret:1,from:0,to:5}, desc:'The classic E-shape barre at fret 1. Slide it up the neck to play any major chord.',               fingering:'Index: full barre fret 1 · Middle: G string 2nd fret · Ring: A string 3rd fret · Pinky: D string 3rd fret'},
+  {name:'Bm',    full:'Bm Barre (Am shape)', category:'barre',   tuning:[-1,2,4,4,3,2],  barre:{fret:2,from:1,to:5}, desc:'Am-shape barre at fret 2. Slide this minor shape for any minor chord.',                            fingering:'Index: barre fret 2 (A–high e) · Ring: D string 4th · Pinky: G string 4th · Middle: B string 3rd'},
+  {name:'Bb',    full:'Bb Major',            category:'barre',   tuning:[-1,1,3,3,3,1],  barre:{fret:1,from:1,to:5}, desc:'A-shape barre at fret 1. Very common in pop. A great moveable major shape.',                       fingering:'Index: barre fret 1 (A–high e) · Ring: D, G, B strings at fret 3'},
+  {name:'G#m',   full:'G# Minor',            category:'barre',   tuning:[4,6,6,4,4,4],   barre:{fret:4,from:0,to:5}, desc:'Em-shape barre at fret 4. Appears commonly in pop songs in the key of E or B.',                    fingering:'Index: full barre fret 4 · Ring: A string 6th · Pinky: D string 6th'},
+  // OTHER
+  {name:'Cadd9', full:'Cadd9',               category:'other',   tuning:[-1,3,2,0,1,3],  desc:'One of the most beloved acoustic chords. Richer than a plain C. Pairs perfectly with G and D.',      fingering:'Index: B string 1st fret · Middle: D string 2nd fret · Ring: A string 3rd fret · Pinky: high e 3rd fret'},
+  {name:'Dsus2', full:'Dsus2',               category:'other',   tuning:[-1,-1,0,2,3,0], desc:'Open, suspended sound. No major or minor quality — floats beautifully. Swap with D for colour.',      fingering:'Middle: G string 2nd fret · Ring: B string 3rd fret · D & high e open'},
+  {name:'Gsus4', full:'Gsus4',               category:'other',   tuning:[3,2,0,0,1,3],   desc:'Tension chord that resolves to G. Common in pop and rock intros.',                                    fingering:'Index: B string 1st fret · Middle: A string 2nd fret · Ring: low E 3rd fret · Pinky: high e 3rd fret'},
+  {name:'Asus2', full:'Asus2',               category:'other',   tuning:[-1,0,2,2,0,0],  desc:'Jangly, airy chord. No third — just root, 2nd, 5th. Common in acoustic pop.',                        fingering:'Middle: D string 2nd fret · Ring: G string 2nd fret · A & high e open'},
+  {name:'Em7',   full:'Em7',                 category:'other',   tuning:[0,2,2,0,3,0],   desc:'Lush and melancholic. Add your pinky to Em. Incredibly useful in jazz-pop.',                          fingering:'Middle: A string 2nd fret · Ring: D string 2nd fret · Pinky: B string 3rd fret · Others open'},
+  {name:'Asus4', full:'Asus4',               category:'other',   tuning:[-1,0,2,2,3,0],  desc:'Suspended A chord — tension that wants to resolve. Common in rock intros and builds.',                 fingering:'Middle: D & G strings 2nd fret · Ring: B string 3rd fret · Low E muted'},
+];
+
+// ─── SCALE DATA ───────────────────────────────────────────────────────────────
+const SCALES = [
+  {
+    name:'Pentatonic Minor', level:'beginner', emoji:'🌱',
+    desc:'The most important scale for any guitarist wanting to improvise. 5 notes that sound great over blues, rock, pop, and jazz. Start here — everything else builds from this.',
+    startFret:5, numFrets:4,
+    strings:[
+      [[5,1,true],[8,2,false]],
+      [[5,3,false],[8,4,false]],
+      [[5,5,false],[7,6,false]],
+      [[5,7,false],[7,8,false]],
+      [[5,9,false],[8,10,false]],
+      [[5,1,true],[8,2,false]],
+    ],
+    positions:'<strong>Root:</strong> A minor pentatonic (5th fret). Move the whole pattern up/down to change key. <strong>Pattern:</strong> 2 notes per string. <strong>Use it over:</strong> Am, C, G, F progressions.'
+  },
+  {
+    name:'Major Pentatonic', level:'beginner', emoji:'☀️',
+    desc:'The happy cousin of pentatonic minor. 5 notes with a bright, country/folk/pop feel. Great for soloing over major chord progressions.',
+    startFret:4, numFrets:4,
+    strings:[
+      [[4,1,true],[7,2,false]],
+      [[4,3,false],[7,4,false]],
+      [[4,5,false],[6,6,false]],
+      [[4,7,false],[6,8,false]],
+      [[5,9,false],[7,10,false]],
+      [[4,1,true],[7,2,false]],
+    ],
+    positions:'<strong>Root:</strong> A major pentatonic (4th position). <strong>Tip:</strong> Same notes as C major pentatonic — different starting point. <strong>Use it over:</strong> A, D, E progressions.'
+  },
+  {
+    name:'Natural Minor (Aeolian)', level:'beginner', emoji:'🌙',
+    desc:'The most common minor scale. Melancholic and expressive. Pentatonic minor adds just two extra notes to give you this scale.',
+    startFret:5, numFrets:4,
+    strings:[
+      [[5,1,true],[7,2,false],[8,3,false]],
+      [[5,4,false],[7,5,false],[8,6,false]],
+      [[5,7,false],[7,8,false]],
+      [[5,9,false],[6,10,false],[7,11,false]],
+      [[5,12,false],[7,13,false],[8,14,false]],
+      [[5,1,true],[7,2,false],[8,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A natural minor (5th position). <strong>Formula:</strong> W H W W H W W. <strong>Use it over:</strong> Am, Dm, Em — pop, folk, and jazz.'
+  },
+  {
+    name:'Major Scale (Ionian)', level:'beginner', emoji:'🎵',
+    desc:'The foundation of Western music. Understanding this scale unlocks theory, chord construction, and melodic soloing. Most pop and folk melodies live here.',
+    startFret:5, numFrets:5,
+    strings:[
+      [[5,1,true],[7,2,false],[9,3,false]],
+      [[5,4,false],[7,5,false],[9,6,false]],
+      [[6,7,false],[7,8,false],[9,9,false]],
+      [[6,10,false],[7,11,false],[9,12,false]],
+      [[5,13,false],[7,14,false]],
+      [[5,1,true],[7,2,false],[9,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A major (5th position). <strong>Formula:</strong> W W H W W W H. <strong>Use it over:</strong> Major progressions — pop, country, folk, jazz.'
+  },
+  {
+    name:'Blues Scale', level:'intermediate', emoji:'🎷',
+    desc:'Pentatonic minor with one extra note — the "blue note" (b5). That one note changes everything. Instantly recognisable blues and rock sound.',
+    startFret:5, numFrets:4,
+    strings:[
+      [[5,1,true],[6,2,false],[8,3,false]],
+      [[5,4,false],[6,5,false],[8,6,false]],
+      [[5,7,false],[6,8,false],[7,9,false]],
+      [[5,10,false],[7,11,false]],
+      [[5,12,false],[8,13,false]],
+      [[5,1,true],[6,2,false],[8,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A blues scale (5th position). <strong>Blue note:</strong> The b5 — use it as a passing note. <strong>Use it over:</strong> 12-bar blues, rock, any minor progression.'
+  },
+  {
+    name:'Dorian Mode', level:'intermediate', emoji:'🌊',
+    desc:'A minor scale with a raised 6th. Jazzy and sophisticated — less dark than natural minor. Santana, Pink Floyd, and jazz musicians love this one.',
+    startFret:5, numFrets:5,
+    strings:[
+      [[5,1,true],[7,2,false],[8,3,false]],
+      [[5,4,false],[7,5,false],[8,6,false]],
+      [[5,7,false],[7,8,false],[9,9,false]],
+      [[5,10,false],[7,11,false],[8,12,false]],
+      [[5,13,false],[7,14,false],[8,15,false]],
+      [[5,1,true],[7,2,false],[8,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A Dorian (5th position). <strong>Key difference:</strong> Raised 6th vs natural minor. <strong>Use over:</strong> Minor jazz-pop, ii chords in ii-V-I progressions.'
+  },
+  {
+    name:'Mixolydian Mode', level:'intermediate', emoji:'🌅',
+    desc:'A major scale with a flattened 7th. Sounds bluesy and rock-y while staying bright. Classic rock, blues-rock, and jazz fusion staple.',
+    startFret:5, numFrets:5,
+    strings:[
+      [[5,1,true],[7,2,false],[9,3,false]],
+      [[5,4,false],[7,5,false],[9,6,false]],
+      [[6,7,false],[7,8,false],[9,9,false]],
+      [[5,10,false],[7,11,false],[9,12,false]],
+      [[5,13,false],[7,14,false],[8,15,false]],
+      [[5,1,true],[7,2,false],[9,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A Mixolydian (5th position). <strong>Think:</strong> Major scale with flattened 7th. <strong>Use over:</strong> Dominant 7th chords, rock jams, bluesy major playing.'
+  },
+  {
+    name:'Harmonic Minor', level:'advanced', emoji:'🌹',
+    desc:'Natural minor with a raised 7th. Creates a dramatic, almost Spanish or classical sound. That raised 7th creates a distinctive augmented 2nd interval.',
+    startFret:5, numFrets:5,
+    strings:[
+      [[5,1,true],[7,2,false],[8,3,false]],
+      [[5,4,false],[7,5,false],[8,6,false]],
+      [[5,7,false],[6,8,false],[7,9,false]],
+      [[5,10,false],[7,11,false],[8,12,false]],
+      [[5,13,false],[7,14,false],[8,15,false]],
+      [[5,1,true],[7,2,false],[8,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A harmonic minor (5th position). <strong>Signature:</strong> Augmented 2nd between degrees 6 and 7. <strong>Use over:</strong> Flamenco, neoclassical rock, jazz, dramatic minor progressions.'
+  },
+  {
+    name:'Lydian Mode', level:'advanced', emoji:'✨',
+    desc:'A major scale with a raised 4th. Sounds dreamy, floating, almost ethereal. Joe Satriani and John Petrucci use this extensively.',
+    startFret:5, numFrets:5,
+    strings:[
+      [[5,1,true],[7,2,false],[9,3,false]],
+      [[5,4,false],[7,5,false],[9,6,false]],
+      [[6,7,false],[7,8,false],[9,9,false]],
+      [[6,10,false],[8,11,false],[9,12,false]],
+      [[5,13,false],[7,14,false]],
+      [[5,1,true],[7,2,false],[9,3,false]],
+    ],
+    positions:'<strong>Root:</strong> A Lydian (5th position). <strong>Key note:</strong> The #4 (raised 4th). <strong>Use over:</strong> Major 7th chords, dreamy/cinematic passages, Imaj7 in a major key context.'
+  },
+];
+
+// ─── CHORD DIAGRAM ────────────────────────────────────────────────────────────
+function drawChord(tuning, barre, size='small') {
+  const sm = size === 'small';
+  const CW=sm?10:19, CH=sm?11:20, DR=sm?3.2:6, NUT=sm?3:5;
+  const FRETS=5, S=6;
+  const PL=sm?7:12, PT=sm?17:26, PR=sm?6:10, PB=sm?10:14;
+  const W=PL+(S-1)*CW+PR, H=PT+FRETS*CH+PB;
+  let svg=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  svg+=`<rect x="${PL}" y="${PT-NUT}" width="${(S-1)*CW}" height="${NUT}" fill="#2c3e2d" rx="1"/>`;
+  for(let f=0;f<=FRETS;f++){const y=PT+f*CH;svg+=`<line x1="${PL}" y1="${y}" x2="${PL+(S-1)*CW}" y2="${y}" stroke="#c8c0b0" stroke-width="${f===0?1:0.6}"/>`;}
+  for(let s=0;s<S;s++){const x=PL+s*CW;svg+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${PT+FRETS*CH}" stroke="#c8c0b0" stroke-width="${sm?0.6:1}"/>`;}
+  if(barre&&barre.fret>=1&&barre.fret<=FRETS){
+    const by=PT+(barre.fret-1)*CH+CH/2,bx1=PL+barre.from*CW,bx2=PL+barre.to*CW;
+    svg+=`<rect x="${bx1-DR}" y="${by-DR}" width="${bx2-bx1+DR*2}" height="${DR*2}" rx="${DR}" fill="#2c3e2d"/>`;
+  }
+  const sn=sm?[]:['E','A','D','G','B','e'];
+  for(let s=0;s<S;s++){
+    const fret=tuning[s],x=PL+s*CW;
+    if(fret===-1){svg+=`<text x="${x}" y="${PT-NUT-2}" text-anchor="middle" font-size="${sm?5.5:9}" fill="#c8c0b0" font-family="Lato">✕</text>`;}
+    else if(fret===0){const r=sm?2.5:4;svg+=`<circle cx="${x}" cy="${PT-NUT-r-2}" r="${r}" fill="none" stroke="#2c3e2d" stroke-width="${sm?1:1.5}"/>`;}
+    else if(fret>=1&&fret<=FRETS){
+      const dy=PT+(fret-1)*CH+CH/2;
+      const covered=barre&&barre.fret===fret&&s>=barre.from&&s<=barre.to;
+      if(!covered)svg+=`<circle cx="${x}" cy="${dy}" r="${DR}" fill="#2c3e2d"/>`;
+    }
+    if(!sm)svg+=`<text x="${x}" y="${PT+FRETS*CH+PB-2}" text-anchor="middle" font-size="8" fill="#a8b8aa" font-family="Lato">${sn[s]}</text>`;
+  }
+  svg+='</svg>';
+  return svg;
+}
+
+// ─── SCALE FRETBOARD ─────────────────────────────────────────────────────────
+function drawScaleFretboard(sc) {
+  const {startFret,numFrets,strings}=sc;
+  const CW=42,CH=30,strNames=['E','A','D','G','B','e'];
+  let h=`<div class="fretboard-wrap"><div class="fretboard">`;
+  for(let si=0;si<6;si++){
+    h+=`<div class="fb-row"><div class="fb-label">${strNames[si]}</div><div class="fb-nut" style="height:${CH}px;"></div>`;
+    for(let fi=0;fi<numFrets;fi++){
+      const fret=startFret+fi;
+      const note=strings[si].find(n=>n[0]===fret);
+      h+=`<div class="fb-fret" style="width:${CW}px;height:${CH}px;">${note?`<div class="fb-note${note[2]?' root':''}">${note[1]}</div>`:''}</div>`;
+    }
+    h+=`</div>`;
+  }
+  h+=`<div class="fb-nums-row"><div class="fb-nums-spacer"></div><div class="fb-nums-nut"></div>`;
+  for(let fi=0;fi<numFrets;fi++) h+=`<div class="fb-num" style="width:${CW}px;">${startFret+fi}</div>`;
+  h+=`</div></div></div>`;
+  return h;
+}
+
+// ─── RENDER CHORDS ────────────────────────────────────────────────────────────
+let currentFilter='all', currentModalIdx=null;
+
+function filterChords(cat,el){
+  currentFilter=cat;
+  document.querySelectorAll('.filter-pill').forEach(p=>p.className='filter-pill');
+  const cm={all:'rose',major:'rose',minor:'sand',seventh:'blue',barre:'sage',other:'sand'};
+  el.classList.add('active-'+(cm[cat]||'rose'));
+  renderChords();
+}
+
+function renderChords(){
+  const grid=document.getElementById('chordGrid');
+  const filtered=currentFilter==='all'?CHORDS:CHORDS.filter(c=>c.category===currentFilter);
+  grid.innerHTML=filtered.map(ch=>{
+    const idx=CHORDS.indexOf(ch), key=ch.name+ch.category, status=getStatus(key);
+    return `<div class="chord-card">
+      <div class="status-badge${status?' s-'+status:''}" onclick="event.stopPropagation();cycleBadgeCard('${key}',${idx})">${STATUS_ICON[status]||''}</div>
+      <div class="chord-tap-area" onclick="openChord(${idx})">
+        <div class="chord-card-name">${ch.name}</div>
+        <div class="chord-diagram">${drawChord(ch.tuning,ch.barre||null,'small')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function cycleBadgeCard(key,idx){
+  cycleStatus(key); renderChords();
+  if(currentModalIdx===idx) updateModalStatus(idx,key);
+}
+
+function openChord(idx){
+  currentModalIdx=idx;
+  const ch=CHORDS[idx], key=ch.name+ch.category;
+  document.getElementById('modalTitle').textContent=ch.full;
+  document.getElementById('modalSubtitle').textContent=ch.category.toUpperCase();
+  document.getElementById('modalDiagram').innerHTML=drawChord(ch.tuning,ch.barre||null,'large');
+  document.getElementById('modalDesc').textContent=ch.desc;
+  document.getElementById('modalFingers').innerHTML=`<strong>Fingering:</strong> ${ch.fingering}`;
+  updateModalStatus(idx,key);
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function updateModalStatus(idx,key){
+  const cur=getStatus(key);
+  document.getElementById('modalStatusRow').innerHTML=STATUS_CYCLE.map(s=>{
+    const ac=cur===s?(s===''?'active-default':'active-'+s):'';
+    return `<button class="modal-status-btn ${ac}" onclick="setModalStatus('${key}',${idx},'${s}')">${STATUS_NAME[s]}</button>`;
+  }).join('');
+}
+
+function setModalStatus(key,idx,val){
+  setStatusDirect(key,val); updateModalStatus(idx,key); renderChords();
+}
+
+function closeModal(e){if(e.target===document.getElementById('modalOverlay'))closeModalDirect();}
+function closeModalDirect(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow=''; currentModalIdx=null;
+}
+
+// ─── RENDER SCALES ────────────────────────────────────────────────────────────
+function renderScales(){
+  document.getElementById('scaleList').innerHTML=SCALES.map((sc,i)=>`
+    <div class="scale-card" id="scale-${i}">
+      <div class="scale-card-header" onclick="toggleScale(${i})">
+        <div class="scale-badge badge-${sc.level}">${sc.emoji}</div>
+        <div class="scale-header-text">
+          <div class="scale-name">${sc.name} <span class="level-tag tag-${sc.level}">${sc.level}</span></div>
+          <div class="scale-level">${sc.level==='beginner'?'Start here':sc.level==='intermediate'?'Next steps':'Advanced'}</div>
+        </div>
+        <span class="scale-chevron">⌄</span>
+      </div>
+      <div class="scale-body">
+        <div class="scale-description">${sc.desc}</div>
+        <div class="tab-label">Fretboard — numbers = playing order &nbsp;·&nbsp; 🔴 root note</div>
+        ${drawScaleFretboard(sc)}
+        <div class="scale-positions">${sc.positions}</div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleScale(i){document.getElementById('scale-'+i).classList.toggle('open');}
+
+// ─── PAGE NAV ─────────────────────────────────────────────────────────────────
+function showPage(id,navEl){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  navEl.classList.add('active');
+  document.getElementById('headerTitle').innerHTML = (id==='chords'?'Guitar Chords':'Scales') + ' <span class="sync-dot" id="syncDot"></span>';
+  // Re-grab syncDot reference after innerHTML update
+  window.syncDotEl = document.getElementById('syncDot');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.syncDotEl = syncDot;
+function setSyncState(state){
+  // update whichever dot is visible
+  const dot = document.getElementById('syncDot');
+  if(dot) dot.className='sync-dot'+(state!=='ok'?' '+state:'');
+}
+
+renderScales();
+loadStatuses(); // loads from Supabase then calls renderChords()
+</script>
+</body>
+</html>
